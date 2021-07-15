@@ -4,13 +4,18 @@ export default {
     newTransaction: function() {
         return {
             addInput: function() {
-                return this;
+                // TODO
+                return this
             },
+            
             addOutput: function() {
-                return this;
+                // TODO
+                return this
             },
-            createHex: function() {
-
+            
+            getSignedHex: function() {
+                // TODO
+                throw 'Not Implemented'
             },
         }
     }
