@@ -30,15 +30,50 @@ const walletIds = ['wlC5ZGxA', 'wlDGPIoA', 'wlQfUszB', 'wl25X9bY']
 
 const app = express()
 
-app.get('/', (req, res) => {
+function sendJSON(res, data) {
+    res.header("Content-Type",'application/json');
+    res.send(JSON.stringify(data, null, 4));
+}
 
-    wallets.getTotalBalance(walletIds)
+app.get('/balance', (req, res) => {
+
+    wallets.getBalanceMany(walletIds)
         .then((result) => {
-            res.send({result})
+
+            const sum = Object.values(result).reduce((a, b) => a + b);
+
+            sendJSON(res, {
+                sum,
+                wallets: result
+            })
         })
         .catch((error) => {
-            res.send({error})
+            sendJSON(res, {error})
         })
+})
+
+app.get('/wallet-infos', (req, res) => {
+
+    wallets.getWalletInfos()
+        .then((result) => {
+            sendJSON(res, {result})
+        })
+        .catch((error) => {
+            sendJSON(res, {error})
+        })
+})
+
+app.get('/accounts', async (req, res) => {
+
+    const infos = await wallets.getWalletInfos()
+
+    try {
+        const result = await wallets.getAccounts(infos)
+        sendJSON(res, {result})
+    } catch (error) {
+        sendJSON(res, {error})
+    }
+
 })
 
 app.listen(port, host)
