@@ -8,9 +8,9 @@
     "start": "node server.mjs"
   },
   "dependencies": {
-    "@carnesen/bitcoin-rpc": "0.0.0",
-    "bitcoind-rpc": "^0.8.1",
     "bitcoinjs-lib": "^5.2.0",
-    "express": "^4.16.1"
+    "bluebird": "^3.7.2",
+    "express": "^4.16.1",
+    "node-fetch": "^2.6.1"
   }
 }

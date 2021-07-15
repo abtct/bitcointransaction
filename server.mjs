@@ -1,33 +1,42 @@
 'use strict'
 
+// Ctrl+C fix
+import process from 'process'
+
 // config.json
-import { default as fs } from 'fs'
+import fs from 'fs'
 
 /** @type {{rpcuser:string, rpcpassword:string, host:string, port:string}} */
 const config = JSON.parse(fs.readFileSync('/storage/config.json', 'utf8'))
 
-// Ctrl+C fix
-import { default as process } from 'process'
+// wallets helper
+
+import walletsHelper from "./libtransaction/walletsHelper.mjs"
+const wallets = walletsHelper(config.host, config.port, config.rpcuser, config.rpcpassword)
 
 process.on('SIGINT', () => {
     console.info("Interrupted")
     process.exit(0)
 })
 
+
 // Web server
 import express from 'express'
-import wallets from "./libtransaction/wallets.mjs";
 
 const port = 8080
 const host = '0.0.0.0'
 
+const walletIds = ['wlC5ZGxA', 'wlDGPIoA', 'wlQfUszB', 'wl25X9bY']
+
 const app = express()
+
 app.get('/', (req, res) => {
-    wallets.withRpc(config).getBalance()
-        .then(result => {
+
+    wallets.getTotalBalance(walletIds)
+        .then((result) => {
             res.send({result})
         })
-        .catch(error => {
+        .catch((error) => {
             res.send({error})
         })
 })
