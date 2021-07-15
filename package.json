@@ -11,6 +11,8 @@
     "bitcoinjs-lib": "^5.2.0",
     "bluebird": "^3.7.2",
     "express": "^4.16.1",
+    "glob": "^7.1.7",
+    "glob-promise": "^4.2.0",
     "node-fetch": "^2.6.1"
   }
 }

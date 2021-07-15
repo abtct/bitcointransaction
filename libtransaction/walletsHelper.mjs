@@ -1,4 +1,6 @@
 import RPC from './rpc.mjs'
+import fs from 'fs'
+import glob from 'glob-promise'
 
 export default function(host, port, rpcuser, rpcpassword) {
     return {
@@ -17,13 +19,13 @@ export default function(host, port, rpcuser, rpcpassword) {
             )
         },
 
-        getWallets: async function() {
+        getLoadedWallets: async function() {
             const rpc = this.createClient()
             return await rpc('listwallets')
         },
 
         isWalletLoaded: async function(rpcwallet) {
-            const wallets = await this.getWallets()
+            const wallets = await this.getLoadedWallets()
             for(const w of wallets) {
                 if(w === rpcwallet) {
                     return true
@@ -65,6 +67,47 @@ export default function(host, port, rpcuser, rpcpassword) {
             const nums = await Promise.all(p)
 
             return nums.reduce((a, b) => a + b)
+        },
+
+        getWalletInfos: async function() {
+
+            let wallets = []
+
+            let loaded = await this.getLoadedWallets()
+
+            const isLoaded = function(k) {
+                for(const kk of loadedWallets) {
+                    if(k === kk) {
+                        return true
+                    }
+                }
+                return false
+            }
+
+            const walletInfos = {}
+
+            const files = glob("/storage/wallets*json");
+
+            for(const file of files) {
+                const data = JSON.parse(fs.readFileSync(file, 'utf8'))
+                for(const item of data) {
+                    const rpcwallet = item.rpcwallet
+
+                    if(!isLoaded(rpcwallet)) {
+                        try {
+                            await this.loadWallet(rpcwallet)
+                            loaded.push(rpcwallet)
+                            walletInfos[rpcwallet] = item
+                        } catch(e) {
+                            console.info(`Failed to load wallet ${rpcwallet}: ${e}`)
+                        }
+                    } else if(typeof walletInfos[rpcwallet] === undefined) {
+                        walletInfos[rpcwallet] = item
+                    }
+                }
+            }
+
+            return walletInfos
         },
     }
 }
