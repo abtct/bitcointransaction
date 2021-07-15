@@ -1,0 +1,13 @@
+{
+  "name": "bitcointransaction",
+  "version": "1.0.0",
+  "description": "Bitcoin Transaction",
+  "author": "Acme <acme@acme.com>",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.16.1"
+  }
+}
