@@ -1,4 +1,4 @@
-FROM node:12
+FROM node:13
 
 WORKDIR /usr/src/app
 
@@ -12,4 +12,4 @@ EXPOSE 8080
 
 ENTRYPOINT [ "/usr/local/bin/node" ]
 
-CMD [ "server.js" ]
+CMD [ "server.mjs" ]

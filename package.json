@@ -3,11 +3,13 @@
   "version": "1.0.0",
   "description": "Bitcoin Transaction",
   "author": "Acme <acme@acme.com>",
-  "main": "server.js",
+  "main": "server.mjs",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.mjs"
   },
   "dependencies": {
+    "@carnesen/bitcoin-rpc": "0.0.0",
+    "bitcoind-rpc": "^0.8.1",
     "bitcoinjs-lib": "^5.2.0",
     "express": "^4.16.1"
   }
