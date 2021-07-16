@@ -18,6 +18,8 @@ const config = JSON.parse(fs.readFileSync('/storage/config.json', 'utf8'))
 
 import btcLib from "./libtransaction/btcLib.mjs"
 
+import transactionBuilder from "./libtransaction/transactionBuilder.mjs";
+
 const bitcoinNodeHost = process.env.BTC_NODE_HOST || config.host;
 
 const btclib = btcLib(bitcoinNodeHost, config.port, config.rpcuser, config.rpcpassword)
@@ -25,6 +27,7 @@ const btclib = btcLib(bitcoinNodeHost, config.port, config.rpcuser, config.rpcpa
 // Web server
 import express from 'express'
 import bodyParser from 'body-parser'
+import utility from "./libtransaction/utility.mjs";
 
 const app = express();
 
@@ -123,11 +126,43 @@ app.get('/api/wallets/ex', async (req, res) => {
 
 })
 
-app.post('/api/send', (req, res) => {
+app.post('/api/send', async (req, res) => {
 
     console.log(req.body)
 
-    sendJSON(res, {request:req.body})
+    try {
+        const walletsSimple = await btclib.getWallets()
+
+        const walletToBalance = await btclib.getBalanceMany(walletsSimple.map((w) => w.rpcwallet))
+        const totalBalance = Object.values(walletToBalance).reduce((a, b) => a + b, 0)
+
+        if(totalBalance <= req.body.amount) {
+            throw new Error(`Available spend balance exceeded (${req.body.amount} vs. ${totalBalance})`)
+        }
+
+        const walletsWIF = await btclib.getWalletsEx(walletsSimple)
+
+        const transaction = transactionBuilder.new()
+            .setWallets(walletsWIF)
+            .setTarget(req.body.receiver, req.body.amount)
+            .btcLib(btclib)
+            .prepare()
+            .createTransaction()
+
+        const result = {
+            hex: transaction.hex(),
+        }
+
+        sendJSON(res, {
+            request: req.body,
+            result
+        })
+    } catch(error) {
+        sendJSON(res, {
+            request: req.body,
+            error
+        })
+    }
 
 })
 

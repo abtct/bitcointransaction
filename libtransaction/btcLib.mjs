@@ -43,11 +43,11 @@ export default function(host, port, rpcuser, rpcpassword) {
             await rpc('loadwallet', rpcwallet)
         },
 
-        getBalance: async function(rpcwallet) {
+        getBalance: async function(rpcwallet, minConf = 1) {
             await this.loadWallet(rpcwallet)
 
             const rpc = this.createClient(rpcwallet)
-            return await rpc('getbalance')
+            return await rpc('getbalance', ['*', minConf])
         },
 
         getBalanceMany: async function(rpcwallets, ignoreErrors = true) {
@@ -134,13 +134,13 @@ export default function(host, port, rpcuser, rpcpassword) {
 
              await rpc('walletpassphrase', [passphrase, 60])
 
-             const privkey = await rpc('dumpprivkey', address)
+             const wif = await rpc('dumpprivkey', address)
 
              return {
                 rpcwallet,
                  address,
                  passphrase,
-                 privkey,
+                 wif,
              }
          }
     }

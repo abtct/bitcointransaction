@@ -1,7 +1,5 @@
 import React, { Component } from 'react'
 
-import process from 'process'
-
 import './App.css'
 
 async function fetchAPI(url, options) {
@@ -40,9 +38,13 @@ class App extends Component {
   }
 
   componentDidMount() {
-    this.getBalance()
-        .then(res => this.setState({ balanceResponse: res }))
-        .catch(err => console.log(err))
+    this.setState({ balanceResponse: '...' }, () => {
+
+      this.getBalance()
+          .then(res => this.setState({ balanceResponse: res }))
+          .catch(err => console.log(err))
+
+    })
   }
 
   getBalance = async () => {
@@ -57,13 +59,16 @@ class App extends Component {
 
   handleSubmit = async e => {
     e.preventDefault()
+
+    this.setState({ sendResponse: '...' })
+
     const response = await fetchAPI('/api/send', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        amount: this.state.amount,
+        amount: parseFloat(this.state.amount),
         receiver: this.state.receiver,
       }),
     })
@@ -90,14 +95,6 @@ class App extends Component {
               <strong>Consolidation transaction</strong>
             </p>
 
-            { this.state.sendResponse
-            ? (<pre style={{height:'auto', width:'100%'}}>
-                  {
-                    JSON.stringify(this.state.sendResponse, null, 2)
-                  }
-            </pre>)
-            : ''}
-
             <div style={{width:500,textAlign:'right'}}>
               <label htmlFor="receiver">Receiver</label>
               <input required type="text"
@@ -122,6 +119,14 @@ class App extends Component {
               <button type="submit">Send</button>
               <button type="reset">Clear</button>
             </p>
+
+            { this.state.sendResponse
+                ? (<pre style={{height:'auto', width:'100%'}}>
+                  {
+                    JSON.stringify(this.state.sendResponse, null, 2)
+                  }
+            </pre>)
+                : ''}
             
           </form>
         </div>
