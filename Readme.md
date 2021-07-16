@@ -19,6 +19,7 @@
             --name bitcointransaction \
             -p 8086:8080 \
             -p 3086:3000 \
+            -e API_URL=http://work.people-bitcoins.ru:8086 \
             -v /var/www/www-root/data/www/work.people-bitcoins.ru:/storage
             bitcointransaction
 
@@ -26,7 +27,11 @@
 
         http://work.people-bitcoins.ru:3086/
 
-### Dev command line
+### Dev mode
+
+      docker rm -f bitcointransaction
+
+      docker build -t bitcointransaction -f dev.Dockerfile .
 
       docker run \
          --rm \
@@ -35,7 +40,7 @@
          -v $(pwd):/usr/src/app \
          -v $(pwd)/storage:/storage \
          -p 127.0.0.1:8086:8080 \
-         -p 127.0.0.1:8087:3000 \
+         -p 127.0.0.1:3086:3000 \
          -t -d --entrypoint /bin/bash \
          bitcointransaction
 
