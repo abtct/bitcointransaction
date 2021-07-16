@@ -7,7 +7,7 @@ import sb from 'satoshi-bitcoin'
 
 function getUtxoInput(btclib, wallet)
 {
-    // TODO
+    // TODO - RPC scantxoutset for wallet (synchroniously?)
     return {
         'txid': '6408410f01e2e11ad9dace33a68bad218fb9698ea2c5b36bf116a89416fa8b97',
         'vout': 1,
@@ -78,22 +78,22 @@ function createPsbt(btcNetwork, metaInputs, targets, changeDefaultAddress) {
 
     console.debug('createPsbt: 2')
 
-    // TODO - which keypair?
-    const a = bitcoin.payments.p2wpkh({ pubkey: inputKeyPairs[0].publicKey, network: btcNetwork })
-    const b = bitcoin.payments.p2sh({ redeem: a, network: btcNetwork })
-    const redeemScript = b.redeem.output.toString('hex')
-
-    console.log({ utxosSum, inputs, outputs, fee, utxos, redeemScript })
-
     const psbt = new bitcoin.Psbt({ network: btcNetwork })
-    inputs.forEach(input =>
+
+    inputs.forEach((input, i) => {
+        const a = bitcoin.payments.p2wpkh({pubkey: inputKeyPairs[i].publicKey, network: btcNetwork})
+        const b = bitcoin.payments.p2sh({redeem: a, network: btcNetwork})
+        const redeemScript = b.redeem.output.toString('hex')
+
         psbt.addInput({
             hash: input.txId,
             index: input.vout,
             redeemScript: Buffer.from(redeemScript, 'hex'),
             witnessUtxo: input.witnessUtxo,
-        }),
-    )
+        })
+    })
+
+    console.log({ utxosSum, inputs, outputs, fee, utxos })
 
     outputs.forEach(output => {
         psbt.addOutput({
