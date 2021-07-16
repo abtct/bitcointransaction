@@ -17,13 +17,14 @@
             --net btc \
             --restart unless-stopped \
             --name bitcointransaction \
-            -p 8085:8080 \
+            -p 8086:8080 \
+            -p 3086:3000 \
             -v /var/www/www-root/data/www/work.people-bitcoins.ru:/storage
             bitcointransaction
 
 4. Open UI
 
-        http://work.people-bitcoins.ru:8085/
+        http://work.people-bitcoins.ru:3086/
 
 ### Dev command line
 
@@ -34,5 +35,10 @@
          -v $(pwd):/usr/src/app \
          -v $(pwd)/storage:/storage \
          -p 127.0.0.1:8086:8080 \
+         -p 127.0.0.1:8087:3000 \
          -t -d --entrypoint /bin/bash \
          bitcointransaction
+
+      docker exec -it bitcointransaction /bin/bash
+
+      # $ yarn dev

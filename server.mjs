@@ -22,11 +22,15 @@ const btclib = btcLib(config.host, config.port, config.rpcuser, config.rpcpasswo
 
 // Web server
 import express from 'express'
+import bodyParser from 'body-parser'
 
-const port = 8080
+const app = express();
+
 const host = '0.0.0.0'
+const port = process.env.PORT || 8080;
 
-const app = express()
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
 function sendJSON(res, data) {
     res.header("Content-Type",'application/json')
@@ -45,18 +49,15 @@ const testStaticWalletIds = ['wlC5ZGxA', 'wlDGPIoA', 'wlQfUszB', 'wl25X9bY']
  * Выводим балансы по кошелькам из testStaticWalletIds
  * и суммарный баланс на этих кошельках одной цифрой (примерно столько мы можем максимально отправить)
  */
-app.get('/balance', async (req, res) => {
+app.get('/api/balance', async (req, res) => {
 
     try {
 
-        const result = await btclib.getBalanceMany(testStaticWalletIds)
+        const wallets = await btclib.getBalanceMany(testStaticWalletIds)
 
-        const sum = Object.values(result).reduce((a, b) => a + b)
+        const sum = Object.values(wallets).reduce((a, b) => a + b)
 
-        sendJSON(res, {
-            sum,
-            wallets: result
-        })
+        sendJSON(res, {sum, wallets})
     } catch(error) {
         sendJSON(res, {error})
     }
@@ -69,7 +70,7 @@ app.get('/balance', async (req, res) => {
  *
  * (мы используем wallets...dat.json в ui.php для сохранения доступов к соз-даваемым кошелькам)
  */
-app.get('/wallets', (req, res) => {
+app.get('/api/wallets', (req, res) => {
 
     btclib.getWallets()
         .then((result) => {
@@ -83,7 +84,7 @@ app.get('/wallets', (req, res) => {
 /**
  * Для загруженных кошельков отобразить доп. данные
  */
-app.get('/wallets/ex', async (req, res) => {
+app.get('/api/wallets/ex', async (req, res) => {
 
     try {
         const wallets = await btclib.getWallets()
@@ -95,5 +96,4 @@ app.get('/wallets/ex', async (req, res) => {
 
 })
 
-app.listen(port, host)
-console.log(`running on http://${host}:${port}`)
+app.listen(port, host, () => console.log(`Listening on port ${port}`));
