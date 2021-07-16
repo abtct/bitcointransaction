@@ -3,22 +3,22 @@
 // Ctrl+C fix
 import process from 'process'
 
+process.on('SIGINT', () => {
+    console.info("Interrupted")
+    process.exit(0)
+})
+
 // config.json
 import fs from 'fs'
 
 /** @type {{rpcuser:string, rpcpassword:string, host:string, port:string}} */
 const config = JSON.parse(fs.readFileSync('/storage/config.json', 'utf8'))
 
-// wallets helper
+// Bitcoin library
 
-import walletsHelper from "./libtransaction/walletsHelper.mjs"
-const wallets = walletsHelper(config.host, config.port, config.rpcuser, config.rpcpassword)
+import btcLib from "./libtransaction/btcLib.mjs"
 
-process.on('SIGINT', () => {
-    console.info("Interrupted")
-    process.exit(0)
-})
-
+const btclib = btcLib(config.host, config.port, config.rpcuser, config.rpcpassword)
 
 // Web server
 import express from 'express'
@@ -26,35 +26,52 @@ import express from 'express'
 const port = 8080
 const host = '0.0.0.0'
 
-const walletIds = ['wlC5ZGxA', 'wlDGPIoA', 'wlQfUszB', 'wl25X9bY']
-
 const app = express()
 
 function sendJSON(res, data) {
-    res.header("Content-Type",'application/json');
-    res.send(JSON.stringify(data, null, 4));
+    res.header("Content-Type",'application/json')
+
+    switch(typeof data.error) {
+        case 'object':
+            data.error = data.error.toString();
+    }
+
+    res.send(JSON.stringify(data, null, 4))
 }
 
-app.get('/balance', (req, res) => {
+const testStaticWalletIds = ['wlC5ZGxA', 'wlDGPIoA', 'wlQfUszB', 'wl25X9bY']
 
-    wallets.getBalanceMany(walletIds)
-        .then((result) => {
+/**
+ * Выводим балансы по кошелькам из testStaticWalletIds
+ * и суммарный баланс на этих кошельках одной цифрой (примерно столько мы можем максимально отправить)
+ */
+app.get('/balance', async (req, res) => {
 
-            const sum = Object.values(result).reduce((a, b) => a + b);
+    try {
 
-            sendJSON(res, {
-                sum,
-                wallets: result
-            })
+        const result = await btclib.getBalanceMany(testStaticWalletIds)
+
+        const sum = Object.values(result).reduce((a, b) => a + b)
+
+        sendJSON(res, {
+            sum,
+            wallets: result
         })
-        .catch((error) => {
-            sendJSON(res, {error})
-        })
+    } catch(error) {
+        sendJSON(res, {error})
+    }
 })
 
-app.get('/wallet-infos', (req, res) => {
+/**
+ * Ищем кошельки в DAT.JSON-файле,
+ * загружаем их на ноде (если требуется)
+ * и выводим список WalletInfo для существующих и загруженных кошельков.
+ *
+ * (мы используем wallets...dat.json в ui.php для сохранения доступов к соз-даваемым кошелькам)
+ */
+app.get('/wallets', (req, res) => {
 
-    wallets.getWalletInfos()
+    btclib.getWallets()
         .then((result) => {
             sendJSON(res, {result})
         })
@@ -63,12 +80,14 @@ app.get('/wallet-infos', (req, res) => {
         })
 })
 
-app.get('/accounts', async (req, res) => {
-
-    const infos = await wallets.getWalletInfos()
+/**
+ * Для загруженных кошельков отобразить доп. данные
+ */
+app.get('/wallets/ex', async (req, res) => {
 
     try {
-        const result = await wallets.getAccounts(infos)
+        const wallets = await btclib.getWallets()
+        const result = await btclib.getWalletsEx(wallets)
         sendJSON(res, {result})
     } catch (error) {
         sendJSON(res, {error})

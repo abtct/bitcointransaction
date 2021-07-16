@@ -1,7 +1,6 @@
 import RPC from './rpc.mjs'
 import fs from 'fs'
 import glob from 'glob-promise'
-import rpc from "./rpc.mjs";
 
 export default function(host, port, rpcuser, rpcpassword) {
     return {
@@ -61,11 +60,11 @@ export default function(host, port, rpcuser, rpcpassword) {
                             return {[rpcwallet]: result}
                         })
                         .catch((error) => {
-                            const errmsg = `Error getting balance of ${rpcwallet}: ${error}`;
+                            const errmsg = `Error getting balance of ${rpcwallet}: ${error}`
                             if(!ignoreErrors) {
                                 throw new Error(errmsg)
                             } else {
-                                console.info(errmsg)
+                                console.info(`Ignoring error (getBalanceMany): ${errmsg}`)
                             }
                         })
                 )
@@ -82,7 +81,7 @@ export default function(host, port, rpcuser, rpcpassword) {
             return result
         },
 
-        getWalletInfos: async function() {
+        getWallets: async function() {
 
             const loadedMark = {}
 
@@ -106,7 +105,7 @@ export default function(host, port, rpcuser, rpcpassword) {
                             loadedMark[w] = true
                             result[w] = walletInfo
                         } catch(e) {
-                            console.info(`Failed to load wallet ${w}: ${e}`)
+                            console.info(`Ignoring error (getWallets): Failed to load wallet ${w}: ${e}`)
                         }
                     } else if(typeof result[w] === undefined) {
                         result[w] = walletInfo
@@ -120,18 +119,17 @@ export default function(host, port, rpcuser, rpcpassword) {
             return Object.values(result)
         },
 
-        getAccounts: function(walletInfos, ignoreErrors = true) {
+        getWalletsEx: function(walletInfos, ignoreErrors = true) {
             const p = []
 
-
             for(const w of walletInfos) {
-                p.push(this.dumpAccount(w.rpcwallet, w.address, w.passphrase))
+                p.push(this.getWalletEx(w.rpcwallet, w.address, w.passphrase))
             }
 
             return Promise.all(p)
         },
 
-         dumpAccount: async function(rpcwallet, address, passphrase) {
+         getWalletEx: async function(rpcwallet, address, passphrase) {
             const rpc = this.createClient(rpcwallet)
 
              await rpc('walletpassphrase', [passphrase, 60])

@@ -2,6 +2,21 @@
 
 import fetch from 'node-fetch'
 
+function parseResponse(resp) {
+    if (typeof resp.error !== undefined && resp.error) {
+        throw {
+            resp,
+            rpc: {
+                methodName: method,
+                params,
+                rpcHref
+            },
+        }
+    }
+
+    return resp.result
+}
+
 export default function(host, port, rpcuser, rpcpassword, rpcwallet = null, scheme = 'http') {
     let rpcHref = `${scheme}://${rpcuser}:${rpcpassword}@${host}:${port}/`
     if (rpcwallet) {
@@ -21,25 +36,19 @@ export default function(host, port, rpcuser, rpcpassword, rpcwallet = null, sche
             params,
         }
 
-        const res = await fetch(rpcHref, {
-            method: 'POST',
-            body: JSON.stringify(payload),
-            headers: {"Content-Type": "application/json"},
-        })
+        try {
+            const res = await fetch(rpcHref, {
+                method: 'POST',
+                body: JSON.stringify(payload),
+                headers: {"Content-Type": "application/json"},
+            })
 
-        const result = await res.json()
+            const resp = await res.json()
 
-        if (typeof result.error !== undefined && result.error) {
-            throw {
-                result,
-                rpc: {
-                    methodName: method,
-                    params,
-                    rpcHref
-                },
-            }
+            return parseResponse(resp)
+
+        } catch(e) {
+            throw new Error(`RPC error (${method}): ${e}`)
         }
-
-        return result.result
     }
 }
