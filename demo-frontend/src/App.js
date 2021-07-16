@@ -5,9 +5,28 @@ import process from 'process'
 import './App.css'
 
 async function fetchAPI(url, options) {
-  const baseApiUrl = process.env.API_URL || 'http://localhost:8086'
-  url = baseApiUrl + url
-  return await fetch(url, options)
+
+  let apiHost = 'http://work.people-bitcoins.ru:8086'
+
+  const location = window.location;
+
+  if (location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.hostname === "") {
+    apiHost = 'http://127.0.0.1:8086'
+  }
+
+  let apiUrl = url
+
+  if(url.startsWith('/')) {
+    apiUrl = apiHost + url
+  }
+
+  console.warn({
+    url,
+    apiHost,
+    apiUrl,
+  })
+
+  return await fetch(apiUrl, options)
 }
 
 window.fetchAPI = fetchAPI
@@ -78,8 +97,6 @@ class App extends Component {
                   }
             </pre>)
             : ''}
-
-
 
             <div style={{width:500,textAlign:'right'}}>
               <label htmlFor="receiver">Receiver</label>

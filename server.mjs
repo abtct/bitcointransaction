@@ -18,7 +18,9 @@ const config = JSON.parse(fs.readFileSync('/storage/config.json', 'utf8'))
 
 import btcLib from "./libtransaction/btcLib.mjs"
 
-const btclib = btcLib(config.host, config.port, config.rpcuser, config.rpcpassword)
+const bitcoinNodeHost = process.env.BTC_NODE_HOST || config.host;
+
+const btclib = btcLib(bitcoinNodeHost, config.port, config.rpcuser, config.rpcpassword)
 
 // Web server
 import express from 'express'
@@ -35,8 +37,13 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // Add headers
 app.use(function (req, res, next) {
 
-    // Website you wish to allow to connect
-    res.setHeader('Access-Control-Allow-Origin', 'http://127.0.0.1:3086');
+    const allowedOrigin = process.env.SELF_URL || 'http://127.0.0.1:3086'
+    console.warn({allowedOrigin})
+
+    if(allowedOrigin) {
+        // Website you wish to allow to connect
+        res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+    }
 
     // Request methods you wish to allow
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
@@ -75,7 +82,7 @@ app.get('/api/balance', async (req, res) => {
 
         const wallets = await btclib.getBalanceMany(testStaticWalletIds)
 
-        const sum = Object.values(wallets).reduce((a, b) => a + b)
+        const sum = Object.values(wallets).reduce((a, b) => a + b, 0)
 
         sendJSON(res, {sum, wallets})
     } catch(error) {
