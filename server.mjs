@@ -133,21 +133,15 @@ app.post('/api/send', async (req, res) => {
     try {
         const walletsSimple = await btclib.getWallets()
 
-        const walletToBalance = await btclib.getBalanceMany(walletsSimple.map((w) => w.rpcwallet))
-        const totalBalance = Object.values(walletToBalance).reduce((a, b) => a + b, 0)
-
-        if(totalBalance <= req.body.amount) {
-            throw new Error(`Available spend balance exceeded (${req.body.amount} vs. ${totalBalance})`)
-        }
-
         const walletsWIF = await btclib.getWalletsEx(walletsSimple)
 
-        const transaction = transactionBuilder.new()
+        const builder = await transactionBuilder.new()
             .setWallets(walletsWIF)
             .setTarget(req.body.receiver, req.body.amount)
             .btcLib(btclib)
-            .prepare()
-            .createTransaction()
+            .prepare();
+
+        const transaction = builder.createTransaction()
 
         const result = {
             hex: transaction.hex(),

@@ -5,23 +5,35 @@ import bitcoin from 'bitcoinjs-lib'
 
 import sb from 'satoshi-bitcoin'
 
-function getUtxoInput(btclib, wallet)
+async function getUTXOs(btclib, wallet)
 {
-    // TODO - RPC scantxoutset for wallet (synchroniously?)
-    return {
-        'txid': '6408410f01e2e11ad9dace33a68bad218fb9698ea2c5b36bf116a89416fa8b97',
-        'vout': 1,
-        'address': '2Mz48MFqqPwV5XfQoNCNpEqt8kVL7jW5kiq',
-        'label': '',
-        'redeemScript': '0014909651c8cc8dcaffa9aa8efa4104d4609a2062fe',
-        'scriptPubKey': 'a9144aaf9924165e4890be15e6290893e0d73013012287',
-        'amount': 0.49946610,
-        'confirmations': 1,
-        'spendable': true,
-        'solvable': true,
-        'desc': 'sh(wpkh([493c3ea9/0\'/0\'/7\']022c1bc64ef6ff9e4eaeeda41119998f1cf76db2a2d0f380af72b37f053da96863))#ve0rr094',
-        'safe': true,
+    const scan = btclib.scanTxOutSet(wallet.rpcwallet, wallet.address)
+    const result = await scan.start()
+
+    const out = {
+        unspents:       [],
+        totalAmount:    0,
     }
+    
+    const err = `scanTxOutSet.start for address ${wallet.address} (${wallet.rpcwallet})`
+
+    if(!result.success) {
+        console.error(`${err} - rpc did not return success`)
+        return out
+    }
+    
+    if(typeof result.unspents !== typeof []) {
+        console.error(`${err} - rpc did not return array of unspents`)
+        return out
+    }
+    
+    out.unspents = result.unspents
+
+    if(result.total_amount) {
+        out.totalAmount = parseFloat(result.total_amount)
+    }
+
+    return out
 }
 
 function createPsbt(btcNetwork, metaInputs, targets, changeDefaultAddress) {
@@ -208,7 +220,7 @@ export default {
                 return this._transaction.hex()
             },
 
-            prepare: function() {
+            prepare: async function() {
 
                 if(this._inputs.length > 0) {
                     throw new Error('prepare: transaction inputs are ready')
@@ -222,24 +234,43 @@ export default {
                     throw new Error('prepare: btclib is required')
                 }
 
+                let btcTotalUnspent = 0
+
                 for(const w of this._wallets) {
                     try {
-                        const utxo = getUtxoInput(this._btclib, w)
-                        if(!utxo) {
+
+                        const {unspents, totalAmount} = await getUTXOs(this._btclib, w)
+                        if(!unspents) {
                             continue
                         }
-                        
-                        this._inputs.push({
+
+                        console.warn({unspents, totalAmount})
+
+                        btcTotalUnspent += totalAmount
+
+                        unspents.forEach(utxo => this._inputs.push({
                             rpcwallet: w.rpcwallet,
                             address: w.address,
                             wif: w.wif,
 
                             transaction: utxo,
-                        })
+                        }))
+
                     } catch(error) {
-                        throw new Error(`prepare: getUtxoInput: ${w.rpcwallet} (${w.address}) failed: ${error}`)
+                        throw new Error(`prepare: getUTXOs: ${w.rpcwallet} (${w.address}) failed: ${error}`)
                     }
                 }
+
+                let totalUnspent = sb.toSatoshi(btcTotalUnspent)
+
+                let totalRequest = 0
+                for(const target of this._targets) {
+                    totalRequest += target.value
+                }
+
+                // if(totalRequest >= totalUnspent) {
+                //     throw new Error(`Total request vs. total unspent ${totalRequest} vs ${totalUnspent} (satoshi): unspent`)
+                // }
 
                 return this
             },

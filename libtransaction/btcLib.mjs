@@ -129,19 +129,37 @@ export default function(host, port, rpcuser, rpcpassword) {
             return Promise.all(p)
         },
 
-         getWalletEx: async function(rpcwallet, address, passphrase) {
+        getWalletEx: async function(rpcwallet, address, passphrase) {
             const rpc = this.createClient(rpcwallet)
 
-             await rpc('walletpassphrase', [passphrase, 60])
+            await rpc('walletpassphrase', [passphrase, 60])
 
-             const wif = await rpc('dumpprivkey', address)
+            const wif = await rpc('dumpprivkey', address)
 
-             return {
-                rpcwallet,
-                 address,
-                 passphrase,
-                 wif,
-             }
-         }
+            return {
+            rpcwallet,
+             address,
+             passphrase,
+             wif,
+            }
+        },
+
+        scanTxOutSet: function(rpcwallet, address) {
+            const btclib = this;
+            const rpc = btclib.createClient(rpcwallet)
+            const descriptors = [`addr(${address})`]
+
+            return {
+                start: function() {
+                    return rpc('scantxoutset', ['start', descriptors])
+                },
+                abort: function() {
+                    return rpc('scantxoutset', ['abort', descriptors])
+                },
+                status: function() {
+                    return rpc('scantxoutset', ['status', descriptors])
+                }
+            }
+        }
     }
 }
