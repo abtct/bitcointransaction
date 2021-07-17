@@ -135,21 +135,22 @@ app.post('/api/send', async (req, res) => {
 
         const walletsWIF = await btclib.getWalletsEx(walletsSimple)
 
-        const builder = await transactionBuilder.new()
+        const builder = transactionBuilder.new()
             .setWallets(walletsWIF)
             .setTarget(req.body.receiver, req.body.amount)
-            .btcLib(btclib)
-            .prepare();
+            .btcLib(btclib);
 
-        const transaction = builder.createTransaction()
+        await builder.prepare()
 
-        const result = {
-            hex: transaction.hex(),
-        }
+        const result = builder.createTransaction()
+            .result()
+
+        const resp = btclib.sendRawTransaction(builder.hex())
 
         sendJSON(res, {
             request: req.body,
-            result
+            hex: builder.hex(),
+            resp,
         })
     } catch(error) {
         sendJSON(res, {

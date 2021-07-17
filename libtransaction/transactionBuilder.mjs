@@ -1,5 +1,6 @@
 
-import coinSelect from 'coinselect'
+import coinSelect1 from 'coinselect/blackjack.js'
+import coinSelect2 from 'coinselect/accumulative.js'
 
 import bitcoin from 'bitcoinjs-lib'
 
@@ -49,11 +50,14 @@ function createPsbt(btcNetwork, metaInputs, targets, changeDefaultAddress) {
         const keyPair = bitcoin.ECPair.fromWIF(input.wif, btcNetwork)
         inputKeyPairs.push(keyPair)
 
+        console.warn({tra: input})
+
         return {
             txId: t.txid,
             vout: t.vout,
             value: parseInt((t.amount * 10 ** 8).toFixed(8), 10),
             scriptPubKey: t.scriptPubKey,
+            desc: t.desc,
             // redeemScript: i.redeemScript,
             // nonWitnessUtxo: Buffer.from(i.hash, 'hex'),
             witnessUtxo: {
@@ -69,16 +73,32 @@ function createPsbt(btcNetwork, metaInputs, targets, changeDefaultAddress) {
 
     console.warn({
         targets,
-        utxos
+        utxos,
     })
 
-    let { inputs, outputs, fee } = coinSelect(utxos, targets, 15)
+    let outputs = null,
+        inputs = null,
+        fee = null
 
-    console.warn({
-        outputs,
-        inputs,
-        fee
-    })
+    for(const coinSelect of [coinSelect1, coinSelect2]) {
+        let coinSelectResult = coinSelect(utxos, targets, 15)
+
+        console.warn({
+            coinSelect,
+            coinSelectResult,
+        })
+
+        if(coinSelectResult.outputs !== undefined && coinSelectResult.inputs !== undefined) {
+            outputs = coinSelectResult.outputs
+            inputs = coinSelectResult.inputs
+            fee = coinSelectResult.fee
+            break
+        }
+    }
+
+    if(!outputs && !inputs) {
+        throw new Error('coinSelect algorithms failed')
+    }
 
     outputs = outputs.map(i => {
         if (!i.address) {
@@ -216,10 +236,6 @@ export default {
                 return this
             },
 
-            hex: function() {
-                return this._transaction.hex()
-            },
-
             prepare: async function() {
 
                 if(this._inputs.length > 0) {
@@ -239,7 +255,7 @@ export default {
                 for(const w of this._wallets) {
                     try {
 
-                        const {unspents, totalAmount} = await getUTXOs(this._btclib, w)
+                        const { unspents, totalAmount } = await getUTXOs(this._btclib, w)
                         if(!unspents) {
                             continue
                         }
@@ -317,6 +333,18 @@ export default {
 
                 return this
             },
+
+            result: function() {
+                if(!this._transaction) {
+                    throw new Error('cannot get created transaction')
+                }
+
+                return this._transaction
+            },
+
+            hex: function() {
+                return this.result().toHex()
+            }
         }
     }
 }

@@ -160,6 +160,11 @@ export default function(host, port, rpcuser, rpcpassword) {
                     return rpc('scantxoutset', ['status', descriptors])
                 }
             }
+        },
+
+        sendRawTransaction: function(hex) {
+            const rpc = this.createClient(null)
+            return rpc('sendrawtransaction', [hex])
         }
     }
 }
