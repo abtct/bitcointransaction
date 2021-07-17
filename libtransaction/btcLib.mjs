@@ -144,24 +144,6 @@ export default function(host, port, rpcuser, rpcpassword) {
             }
         },
 
-        scanTxOutSet: function(rpcwallet, address) {
-            const btclib = this;
-            const rpc = btclib.createClient(rpcwallet)
-            const descriptors = [`addr(${address})`]
-
-            return {
-                start: function() {
-                    return rpc('scantxoutset', ['start', descriptors])
-                },
-                abort: function() {
-                    return rpc('scantxoutset', ['abort', descriptors])
-                },
-                status: function() {
-                    return rpc('scantxoutset', ['status', descriptors])
-                }
-            }
-        },
-
         sendRawTransaction: function(hex) {
             const rpc = this.createClient(null)
             return rpc('sendrawtransaction', [hex])

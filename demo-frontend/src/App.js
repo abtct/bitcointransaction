@@ -32,9 +32,19 @@ window.fetchAPI = fetchAPI
 class App extends Component {
   state = {
     balanceResponse: '',
-    sendResponse: '',
+    actionResponse: '',
     amount: 0.002,
     receiver: '',
+  }
+
+  getActionText() {
+    if(this.state.actionResponse.transactionHex) {
+      return 'Send'
+    } else if(this.state.actionResponse.sendRawTransactionResponse) {
+      return 'SENT!'
+    }
+
+    return 'Generate'
   }
 
   componentDidMount() {
@@ -60,21 +70,37 @@ class App extends Component {
   handleSubmit = async e => {
     e.preventDefault()
 
-    this.setState({ sendResponse: '...' })
+    this.setState({actionResponse: '...'})
 
-    const response = await fetchAPI('/api/send', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        amount: parseFloat(this.state.amount),
-        receiver: this.state.receiver,
-      }),
-    })
-    const body = await response.json()
+    if (!this.state.actionResponse.transactionHex) {
+      const response = await fetchAPI('/api/generate/consolidation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          amount: parseFloat(this.state.amount),
+          receiver: this.state.receiver,
+        }),
+      })
+      const body = await response.json()
 
-    this.setState({ sendResponse: body })
+      this.setState({sendResponse: body})
+    } else {
+      const response = await fetchAPI('/api/send/transaction', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          transactionHex: this.state.actionResponse.transactionHex
+        }),
+      })
+      const body = await response.json()
+
+      this.setState({actionResponse: body})
+    }
+
   }
 
   render() {
@@ -92,7 +118,7 @@ class App extends Component {
 
           <form onSubmit={this.handleSubmit}>
             <p>
-              <strong>Consolidation transaction</strong>
+              <strong>UTXO Consolidation (aggregating transaction)</strong>
             </p>
 
             <div style={{width:500,textAlign:'right'}}>
@@ -116,19 +142,20 @@ class App extends Component {
             </div>
 
             <p>
-              <button type="submit">Send</button>
+              <button type="submit">{this.getActionText()}</button>
               <button type="reset">Clear</button>
             </p>
 
-            { this.state.sendResponse
+            { this.state.actionResponse
                 ? (<pre style={{height:'auto', width:'100%'}}>
                   {
-                    JSON.stringify(this.state.sendResponse, null, 2)
+                    JSON.stringify(this.state.actionResponse, null, 2)
                   }
             </pre>)
                 : ''}
             
           </form>
+
         </div>
     )
   }

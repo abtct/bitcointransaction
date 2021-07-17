@@ -16,9 +16,11 @@ const config = JSON.parse(fs.readFileSync('/storage/config.json', 'utf8'))
 
 // Bitcoin library
 
+import sb from 'satoshi-bitcoin'
+
 import btcLib from "./libtransaction/btcLib.mjs"
 
-import transactionBuilder from "./libtransaction/transactionBuilder.mjs";
+import utxoConsolidation from './libtransaction/utxoConsolidation.mjs'
 
 const bitcoinNodeHost = process.env.BTC_NODE_HOST || config.host;
 
@@ -27,7 +29,6 @@ const btclib = btcLib(bitcoinNodeHost, config.port, config.rpcuser, config.rpcpa
 // Web server
 import express from 'express'
 import bodyParser from 'body-parser'
-import utility from "./libtransaction/utility.mjs";
 
 const app = express();
 
@@ -126,44 +127,43 @@ app.get('/api/wallets/ex', async (req, res) => {
 
 })
 
-app.post('/api/send', async (req, res) => {
+app.post('/api/generate/consolidation', async (req, res) => {
 
     console.log(req.body)
 
     try {
-        const walletsSimple = await btclib.getWallets()
-
-        const walletsWIF = await btclib.getWalletsEx(walletsSimple)
-
-        const builder = transactionBuilder.new()
-            .setWallets(walletsWIF)
-            .setTarget(req.body.receiver, req.body.amount)
-            .btcLib(btclib);
-
-        await builder.prepare()
-
-        const result = builder.createTransaction()
-            .result()
-
-        let sendTransactionResponse = {}
-        try {
-            sendTransactionResponse = await btclib.sendRawTransaction(builder.hex())
-        } catch(error) {
-            sendTransactionResponse = {error}
-        }
-
-        sendJSON(res, {
-            request: req.body,
-            hex: builder.hex(),
-            sendTransactionResponse,
+        const transaction = await utxoConsolidation({
+            btclib,
+            wallets: await btclib.getWalletsEx(await btclib.getWallets()),
+            receivers: [{
+                address:    req.body.receiver,
+                value:      sb.toSatoshi(req.body.amount)
+            }]
         })
+
+        sendJSON(res, {transactionHex: transaction.toHex()})
     } catch(error) {
         sendJSON(res, {
             request: req.body,
             error
         })
     }
+})
 
+app.post('/api/send/transaction', async (req, res) => {
+
+    console.log(req.body)
+
+    try {
+        const resp = await btclib.sendRawTransaction(req.body.transactionHex)
+
+        sendJSON(res, {sendRawTransactionResponse: resp})
+    } catch(error) {
+        sendJSON(res, {
+            request: req.body,
+            error
+        })
+    }
 })
 
 app.listen(port, host, () => console.log(`Listening on port ${port}`));
