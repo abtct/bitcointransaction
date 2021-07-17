@@ -145,12 +145,17 @@ app.post('/api/send', async (req, res) => {
         const result = builder.createTransaction()
             .result()
 
-        const resp = btclib.sendRawTransaction(builder.hex())
+        let sendTransactionResponse = {}
+        try {
+            sendTransactionResponse = await btclib.sendRawTransaction(builder.hex())
+        } catch(error) {
+            sendTransactionResponse = {error}
+        }
 
         sendJSON(res, {
             request: req.body,
             hex: builder.hex(),
-            resp,
+            sendTransactionResponse,
         })
     } catch(error) {
         sendJSON(res, {
