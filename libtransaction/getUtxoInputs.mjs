@@ -1,43 +1,15 @@
-
 import sb from 'satoshi-bitcoin'
+import getWithCache from "./getWithCache.mjs";
+import {scanUtxoRpcLoop} from "./scanUtxoRpcLoop.mjs";
 
-async function scanUtxoRpcLoop({rpc, descriptors}) {
-
-    const getScanStatus = () => rpc('scantxoutset', ['status', descriptors])
-    const getScanStart = () => rpc('scantxoutset', ['start', descriptors])
-
+async function scanUtxoRpcLoopWrap({wallet, rpc, descriptors}) {
     try {
-        console.debug({start: {descriptors}})
-        return await getScanStart()
+        return await getWithCache(
+            `.cacheUTXOs.${wallet.address}.json`,
+            () => scanUtxoRpcLoop({rpc, descriptors})
+        )
     } catch(error) {
-        if(error.toString().indexOf('Scan already in progress, use action') === -1) {
-            throw error
-        }
-
-        console.warn({scanAlreadyInProgressError: {descriptors}})
-
-        let result = {}
-
-        for(let hits = 0; hits < 20; hits++) {
-            result = await getScanStatus()
-
-            if(result == null) {
-                console.warn('get scan status returned null for descriptors: ' + JSON.stringify(descriptors))
-                return await getScanStatus()
-            }
-
-            if (result.progress !== undefined) {
-                console.debug({descriptors, progress: result.progress})
-            }
-
-            if (result.progress >= 100 || result.success) {
-                break
-            }
-
-            await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-
-        return result
+        throw new Error(`Get UTXO for rpcwallet ${wallet.rpcwallet} address ${wallet.address} error: ${error}`)
     }
 }
 
@@ -46,14 +18,7 @@ async function getUtxoInputs({btclib, wallet}) {
 
     const descriptors = [`addr(${wallet.address})`]
 
-    const result = await scanUtxoRpcLoop({rpc, descriptors})
-
-    console.debug(JSON.stringify({descriptors, result}))
-
-    if (!result.success) {
-        console.error({result})
-        throw new Error(`RPC scantxoutset did not succeed`)
-    }
+    const result = await scanUtxoRpcLoopWrap({ wallet, rpc, descriptors })
 
     const unspents = []
 
@@ -66,12 +31,7 @@ async function getUtxoInputs({btclib, wallet}) {
     for(const utxo of result.unspents) {
         const txHex = await rpc('getrawtransaction', [utxo.txid])
 
-        console.warn({
-            getRawTransaction: {
-                txHex,
-                amountInSatoshi: sb.toSatoshi(utxo.amount),
-            }
-        })
+        console.warn({nonWitnessUtxo: {txHex}})
 
         unspents.push({
             txId: utxo.txid,
