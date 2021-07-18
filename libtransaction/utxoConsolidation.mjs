@@ -1,8 +1,7 @@
 
 import bitcoin from 'bitcoinjs-lib'
 import sb from 'satoshi-bitcoin'
-import coinSelect from 'coinSelect'
-import getWithCache from "./getWithCache.mjs";
+import coinSelect from 'coinselect'
 import getUtxoInputs from "./getUtxoInputs.mjs";
 
 function validatedWallets(wallets) {
