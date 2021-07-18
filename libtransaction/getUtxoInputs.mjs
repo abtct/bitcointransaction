@@ -5,7 +5,7 @@ import {scanUtxoRpcLoop} from "./scanUtxoRpcLoop.mjs";
 async function scanUtxoRpcLoopWrap({wallet, rpc, descriptors}) {
     try {
         return await getWithCache(
-            `.cacheUTXOs.${wallet.address}.json`,
+            `/storage/.cacheUTXOs.${wallet.address}.json`,
             () => scanUtxoRpcLoop({rpc, descriptors})
         )
     } catch(error) {

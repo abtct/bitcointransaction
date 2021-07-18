@@ -9,10 +9,10 @@ process.on('SIGINT', () => {
 })
 
 // config.json
-import fs from 'fs'
+import {promises as fs, default as fsSync} from 'fs'
 
 /** @type {{rpcuser:string, rpcpassword:string, host:string, port:string}} */
-const config = JSON.parse(fs.readFileSync('/storage/config.json', 'utf8'))
+const config = JSON.parse(fsSync.readFileSync('/storage/config.json', 'utf8'))
 
 // Bitcoin library
 
@@ -151,14 +151,29 @@ app.post('/api/generate/consolidation', async (req, res) => {
     }
 })
 
+async function clearCache(wallets) {
+    const filenames = wallets.map(w => `/storage/.cacheUTXOs.${w.address}.json`)
+    const p = filenames.map(f => {
+        try {
+            fs.unlink(f)
+        } catch(_) {}
+    })
+    await Promise.all(p)
+    return filenames
+}
+
 app.post('/api/send/transaction', async (req, res) => {
 
     console.log(req.body)
 
     try {
         const resp = await btclib.sendRawTransaction(req.body.transactionHex)
+        const cacheFiles = clearCache(await btclib.getWallets())
 
-        sendJSON(res, {sendRawTransactionResponse: resp})
+        sendJSON(res, {
+            sendRawTransactionResponse: resp,
+            cacheFilesDeleted: cacheFiles.length,
+        })
     } catch(error) {
         console.error(error.stack)
         sendJSON(res, {

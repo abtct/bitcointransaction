@@ -39,9 +39,9 @@ class App extends Component {
 
   getActionText() {
     if(this.state.actionResponse.transactionHex) {
-      return 'Send'
+      return 'Broadcast'
     } else if(this.state.actionResponse.sendRawTransactionResponse) {
-      return 'SENT!'
+      return 'Generate over'
     }
 
     return 'Generate'
@@ -85,7 +85,7 @@ class App extends Component {
       })
       const body = await response.json()
 
-      this.setState({sendResponse: body})
+      this.setState({actionResponse: body})
     } else {
       const response = await fetchAPI('/api/send/transaction', {
         method: 'POST',
