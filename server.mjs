@@ -16,8 +16,6 @@ const config = JSON.parse(fs.readFileSync('/storage/config.json', 'utf8'))
 
 // Bitcoin library
 
-import sb from 'satoshi-bitcoin'
-
 import btcLib from "./libtransaction/btcLib.mjs"
 
 import utxoConsolidation from './libtransaction/utxoConsolidation.mjs'
@@ -90,6 +88,7 @@ app.get('/api/balance', async (req, res) => {
 
         sendJSON(res, {sum, wallets})
     } catch(error) {
+        console.error(error.stack)
         sendJSON(res, {error})
     }
 })
@@ -108,6 +107,7 @@ app.get('/api/wallets', (req, res) => {
             sendJSON(res, {result})
         })
         .catch((error) => {
+            console.error(error.stack)
             sendJSON(res, {error})
         })
 })
@@ -137,12 +137,13 @@ app.post('/api/generate/consolidation', async (req, res) => {
             wallets: await btclib.getWalletsEx(await btclib.getWallets()),
             receivers: [{
                 address:    req.body.receiver,
-                value:      sb.toSatoshi(req.body.amount)
+                value:      req.body.amount
             }]
         })
 
         sendJSON(res, {transactionHex: transaction.toHex()})
     } catch(error) {
+        console.error(error.stack)
         sendJSON(res, {
             request: req.body,
             error
@@ -159,6 +160,7 @@ app.post('/api/send/transaction', async (req, res) => {
 
         sendJSON(res, {sendRawTransactionResponse: resp})
     } catch(error) {
+        console.error(error.stack)
         sendJSON(res, {
             request: req.body,
             error

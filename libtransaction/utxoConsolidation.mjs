@@ -3,6 +3,54 @@ import bitcoin from 'bitcoinjs-lib'
 
 import getUtxoInputs from "./getUtxoInputs.mjs";
 
+import sb from 'satoshi-bitcoin'
+
+import coinSelect from 'coinSelect'
+
+import { promises as fs } from 'fs'
+
+import path from 'path'
+
+const ONE_HOUR = 60 * 60 * 1000; /* ms */
+
+async function getUtxoInputsWrap({btclib, wallet}) {
+    try {
+        const cacheFileName = `.cacheUTXOs.${wallet.address}.json`
+
+        try {
+            const cache = JSON.parse(await fs.readFile(cacheFileName, 'utf8'))
+
+            if(((new Date) - cache.timestamp) < ONE_HOUR) {
+                console.debug(`Cache file used for UTXOs: ${cacheFileName}`)
+                return cache.result
+            } else {
+                console.debug(`Cache file is outdated and not used for UTXOs: ${cacheFileName}`)
+            }
+
+        }
+        catch(_) {
+            console.debug(`Cache file handling filed: ${cacheFileName}`)
+        }
+
+        const result = await getUtxoInputs({btclib, wallet})
+
+        const cache = {
+            timestamp: (new Date).getTime(),
+            result,
+        }
+
+        await fs.writeFile(cacheFileName, JSON.stringify(cache), 'utf8')
+
+        console.debug(`Cache file written: ${cacheFileName}`)
+
+        return result
+
+    } catch(error) {
+        console.error(error.stack)
+        throw new Error(`Get UTXO for rpcwallet ${wallet.rpcwallet} address ${wallet.address} error: ${error}`)
+    }
+}
+
 function validatedWallets(wallets) {
     if(!Array.isArray(wallets)) {
         throw new Error('wallets is not an array')
@@ -52,24 +100,61 @@ function validatedOutputs(receivers) {
         if(i > 0 && !receivers[i].address) {
             receivers[i].address = defaultAddress
         }
+
+        receivers[i].value = sb.toSatoshi(receivers[i].value)
     }
     return receivers
 }
 
 async function utxoConsolidation({btclib, wallets, receivers, network = bitcoin.networks.testnet}) {
-    const p = validatedWallets(wallets).map(w => getUtxoInputs(btclib, w, network))
-    const origin = {
-        inputs:     validatedInputs(await Promise.all(p)),
+
+    const utxoKeyPairs = {}
+
+    const spendableUTXOs = []
+
+    for(const wallet of validatedWallets(wallets)) {
+        const utxos = await getUtxoInputsWrap({btclib, wallet, network})
+
+        const keyPair = bitcoin.ECPair.fromWIF(wallet.wif, network)
+
+        for(const utxo of utxos) {
+            spendableUTXOs.push(utxo)
+            utxoKeyPairs[utxo.txId] = keyPair
+        }
+    }
+
+    const given = {
+        inputs:     validatedInputs(spendableUTXOs),
         outputs:    validatedOutputs(receivers),
     }
 
-    const { inputs, outputs, fee } = coinSelect(origin.inputs, origin.outputs, 15)
+    console.info(JSON.stringify({
+        consolidation: {
+            wallets,
+            receivers,
+            prepare: {
+                given,
+            },
+        },
+    }))
+
+    const { inputs, outputs, fee } = coinSelect(given.inputs, given.outputs, 15)
+
+    console.info(JSON.stringify({
+        consolidation: {
+            coinSelect: {
+                inputs,
+                outputs,
+                fee
+            }
+        }
+    }))
 
     if(inputs === undefined && outputs === undefined) {
         throw new Error('coinSelect failed (undefined)')
     }
 
-    const changeAddress = this._inputs[this._inputs.length - 1].address
+    const changeAddress = given.inputs[given.inputs.length - 1].address
 
     const psbt = new bitcoin.Psbt({ network })
 
@@ -82,14 +167,24 @@ async function utxoConsolidation({btclib, wallets, receivers, network = bitcoin.
     })
 
     outputs.forEach(output => {
-        psbt.addOutput({
+        const def = {
             address: output.address,
             value: output.value,
-        })
+        }
+
+        if(!def.address) {
+            def.address = changeAddress
+        }
+
+        psbt.addOutput(def)
     })
 
     inputs.forEach((input, i) => {
-        psbt.signInput(i, input.keyPair)
+        const keyPair = utxoKeyPairs[input.txId]
+        if(!keyPair) {
+            throw new Error(`utxoKeyPairs not found for txId ${input.txId} (Psbt input index ${i}) `)
+        }
+        psbt.signInput(i, keyPair)
     })
 
     psbt.validateSignaturesOfAllInputs()
