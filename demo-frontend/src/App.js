@@ -35,6 +35,8 @@ class App extends Component {
     actionResponse: '',
     amount: 0.002,
     receiver: '',
+    feeRate: 15,
+    changeAddress: ''
   }
 
   getActionText() {
@@ -130,7 +132,7 @@ class App extends Component {
                      onChange={e => this.setState({receiver: e.target.value})}
               />
             </div>
-            
+
             <div style={{width:500,textAlign:'right'}}>
               <label htmlFor="transfer_amount">Amount</label>
               <input required type="number" step="0.0001"
@@ -138,6 +140,26 @@ class App extends Component {
                      id="transfer_amount"
                      value={this.state.amount}
                      onChange={e => this.setState({amount: e.target.value})}
+              />
+            </div>
+
+            <div style={{width:500,textAlign:'right'}}>
+              <label htmlFor="transfer_fee_rate">Fee rate</label>
+              <input required type="number" step="1"
+                     style={{width: '60%'}}
+                     id="transfer_fee_rate"
+                     value={this.state.feeRate}
+                     onChange={e => this.setState({feeRate: e.target.value})}
+              />
+            </div>
+
+            <div style={{width:500,textAlign:'right'}}>
+              <label htmlFor="transfer_change_address">Change receiver</label>
+              <input required type="string"
+                     style={{width: '60%'}}
+                     id="transfer_change_address"
+                     value={this.state.changeAddress}
+                     onChange={e => this.setState({changeAddress: e.target.value})}
               />
             </div>
 

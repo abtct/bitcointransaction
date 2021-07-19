@@ -132,13 +132,17 @@ app.post('/api/generate/consolidation', async (req, res) => {
     console.log(req.body)
 
     try {
+        const wallets = await btclib.getWallets()
+
         const transaction = await utxoConsolidation({
             btclib,
-            wallets: await btclib.getWalletsEx(await btclib.getWallets()),
+            wallets: await btclib.getWalletsEx(wallets),
             receivers: [{
                 address:    req.body.receiver,
                 value:      req.body.amount
-            }]
+            }],
+            changeAddress: req.body.changeAddress,
+            feeRate: req.body.feeRate,
         })
 
         sendJSON(res, {transactionHex: transaction.toHex()})

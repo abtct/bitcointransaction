@@ -29,7 +29,7 @@ function validatedInputs(inputs) {
     return inputs
 }
 
-function validatedOutputs(receivers) {
+function validatedOutputs({receivers, changeAddress}) {
     if(!Array.isArray(receivers)) {
         throw new Error('receivers is not an array')
     }
@@ -37,8 +37,7 @@ function validatedOutputs(receivers) {
         throw new Error('receivers is empty')
     }
 
-    const defaultAddress = receivers[0].address
-    if(!defaultAddress) {
+    if(!changeAddress) {
         throw new Error('First receivers item must have an address (default change address)')
     }
 
@@ -51,7 +50,7 @@ function validatedOutputs(receivers) {
         }
 
         if(i > 0 && !receivers[i].address) {
-            receivers[i].address = defaultAddress
+            receivers[i].address = changeAddress
         }
 
         receivers[i].value = sb.toSatoshi(receivers[i].value)
@@ -59,7 +58,7 @@ function validatedOutputs(receivers) {
     return receivers
 }
 
-async function utxoConsolidation({btclib, wallets, receivers, network = bitcoin.networks.testnet}) {
+async function utxoConsolidation({btclib, wallets, receivers, changeAddress, feeRate = 15, network = bitcoin.networks.testnet}) {
 
     // map { txId: KeyPair }
     const utxoKeyPairs = {}
@@ -79,15 +78,13 @@ async function utxoConsolidation({btclib, wallets, receivers, network = bitcoin.
     // Coin select
     const { inputs, outputs, fee } = coinSelect(
         validatedInputs(utxoDefs),
-        validatedOutputs(receivers),
-        15
+        validatedOutputs({receivers, changeAddress}),
+        feeRate
     )
 
     if(inputs === undefined && outputs === undefined) {
         throw new Error('coinSelect failed (undefined)')
     }
-
-    const changeAddress = wallets[wallets.length - 1].address
 
     const psbt = new bitcoin.Psbt({ network })
 
