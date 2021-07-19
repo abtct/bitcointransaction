@@ -132,20 +132,35 @@ app.post('/api/generate/consolidation', async (req, res) => {
     console.log(req.body)
 
     try {
-        const wallets = await btclib.getWallets()
+        const wallets = await btclib.getWallets()               // список кошельков
+                                                                // читает из JSON-файла на диске и загружает на ноде
+                                                                // если это требуется
 
-        const transaction = await utxoConsolidation({
-            btclib,
-            wallets: await btclib.getWalletsEx(wallets),
-            receivers: [{
-                address:    req.body.receiver,
+        const walletsWIF = await btclib.getWalletsEx(wallets)   // список кошельков с добавленным полем wif (ключ)
+                                                                // кошельки будут разблокированы (если есть пароль)
+                                                                // и для каждого будет добавлен wif - ключ,
+                                                                // нужный для подписи транзакций
+
+        // Информация, необходимая для создания агреггирующей транзакции
+        const params = {
+            btclib,                                 // для работы с нодой
+            wallets: walletsWIF,                    // кошельки-доноры
+            receivers: [{                           // массив с описанием получаталей. Здесь можно указать несколько
+                address:    req.body.receiver,      // (выход для сдачи/остатка указывать здесь не нужно)
                 value:      req.body.amount
             }],
-            changeAddress: req.body.changeAddress,
-            feeRate: req.body.feeRate,
-        })
+            changeAddress: req.body.changeAddress,  // адрес для получения сдачи от транзакции, если она будет
+            feeRate: req.body.feeRate,              // ставка комиссии. Подробнее читать в описании функции coinSelect()
+        }
+
+        // вызываем генератор транзакции
+
+        const transaction = await utxoConsolidation(params)
+
+        // отправляем транзакцию закодированную в HEX-строку. В принципе, она уже готова для отправки в сеть.
 
         sendJSON(res, {transactionHex: transaction.toHex()})
+
     } catch(error) {
         console.error(error.stack)
         sendJSON(res, {
@@ -171,13 +186,21 @@ app.post('/api/send/transaction', async (req, res) => {
     console.log(req.body)
 
     try {
-        const resp = await btclib.sendRawTransaction(req.body.transactionHex)
-        const cacheFiles = clearCache(await btclib.getWallets())
+        const resp = await btclib.sendRawTransaction(req.body.transactionHex)       // нам прислали HEX транзакции,
+                                                                                    // отправляем ее в сеть
+
+        const cacheFiles = clearCache(await btclib.getWallets())                    // очищает кэш файлы,
+                                                                                    // которые хранят UTXO после
+                                                                                    // сканирования на кошельках (они
+                                                                                    // после транзакции теряют смысл)
+
+            // ответ от ноды будет содержать txid транзакции в сети
 
         sendJSON(res, {
             sendRawTransactionResponse: resp,
             cacheFilesDeleted: cacheFiles.length,
         })
+
     } catch(error) {
         console.error(error.stack)
         sendJSON(res, {
