@@ -52,7 +52,7 @@ class App extends Component {
   }
 
   hasGeneratedTransaction() {
-    return !!this.state.actionResponse.transactionHex
+    return !!this.state.transactionHex
   }
 
   hasSentTransaction() {
@@ -98,7 +98,10 @@ class App extends Component {
       })
       const body = await response.json()
 
-      this.setState({actionResponse: body})
+      this.setState({
+          actionResponse: body,
+          transactionHex: body.transactionHex,
+      })
     })
   }
 
@@ -138,14 +141,13 @@ class App extends Component {
         ...prevState,
         actionResponse: body,
         inputAddresses: body.inputAddresses,
+        transactionHex: body.transactionHex,
       }))
     })
   }
 
   sendTransaction = async e => {
     if(e) e.preventDefault()
-
-      const transactionHex = this.state.actionResponse.transactionHex
 
     this.setState({actionResponse: '...'}, async () => {
       const response = await fetchAPI('/api/send/transaction', {
@@ -156,7 +158,7 @@ class App extends Component {
         body: JSON.stringify({
             login: this.state.manager.login,
             pass: this.state.manager.pass,
-            transactionHex,
+            transactionHex: this.state.transactionHex,
         }),
       })
       const body = await response.json()
@@ -441,7 +443,7 @@ class App extends Component {
                 <div className="input-group">
                   <input required type="textarea" disabled={true}
                          id="t_hex"
-                         value={this.state.actionResponse.transactionHex}
+                         value={this.state.transactionHex}
                   />
                 </div>
 
@@ -452,10 +454,7 @@ class App extends Component {
                           onClick={e => this.setState(prevState => (
                               {
                                 ...prevState,
-                                actionResponse: {
-                                  ...prevState.actionResponse,
                                   transactionHex: ''
-                                }
                               }
                           ))}>
                     Reset

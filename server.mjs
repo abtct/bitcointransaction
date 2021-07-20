@@ -208,6 +208,11 @@ app.post('/api/send/transaction', async (req, res) => {
 
     } catch(error) {
         console.error(error.stack)
+
+        if(error.toString().indexOf('bad-txns-inputs-missingorspent') > -1) {
+            error = 'bad-txns-inputs-missingorspent'
+        }
+
         sendJSON(res, {
             request: req.body,
             error
