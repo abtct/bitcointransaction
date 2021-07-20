@@ -11,7 +11,7 @@
 3. Run image 
 
     Path `/storage` MUST be a mount to working directory 
-    containing `wallets.....dat.json` and `config.json` files.
+    containing `walletsWIF.....dat.json` and `config.json` files.
 
         docker run \
             --restart unless-stopped \
@@ -35,8 +35,6 @@
 
       docker pull node:13
 
-      docker tag node:13 bitcointransaction
-
       docker run \
          --rm \
          --name bitcointransaction \
@@ -48,6 +46,4 @@
          -t -d --entrypoint /bin/bash \
          node:13
 
-      docker exec -it bitcointransaction /bin/bash
-
-      # $ yarn dev
+      docker exec -it bitcointransaction yarn dev

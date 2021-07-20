@@ -1,13 +1,13 @@
 import {promises as fs} from "fs";
 
-const ONE_HOUR = 60 * 60 * 1000; /* ms */
+const ONE_HOUR = 60 * 60;
 
-async function getWithCache(cacheFileName, getPromiseCallback) {
+async function getWithDiskCache(cacheFileName, getPromiseCallback) {
 
     try {
         const cache = JSON.parse(await fs.readFile(cacheFileName, 'utf8'))
 
-        if(((new Date) - cache.timestamp) < ONE_HOUR) {
+        if(((new Date).getTime() / 1000 - cache.timestamp) < ONE_HOUR) {
             console.debug(`Cache file used: ${cacheFileName}`)
             return cache.result
         } else {
@@ -33,4 +33,4 @@ async function getWithCache(cacheFileName, getPromiseCallback) {
     return result
 }
 
-export default getWithCache
+export default getWithDiskCache

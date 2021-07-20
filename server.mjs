@@ -27,6 +27,8 @@ const btclib = btcLib(bitcoinNodeHost, config.port, config.rpcuser, config.rpcpa
 // Web server
 import express from 'express'
 import bodyParser from 'body-parser'
+import getWithDiskCache from "./libtransaction/getWithDiskCache.mjs";
+import getWithoutCache from "./libtransaction/getWithoutCache.mjs";
 
 const app = express();
 
@@ -144,22 +146,25 @@ app.post('/api/generate/consolidation', async (req, res) => {
         // Информация, необходимая для создания агреггирующей транзакции
         const params = {
             btclib,                                 // для работы с нодой
-            wallets: walletsWIF,                    // кошельки-доноры
+            walletsWIF,                             // кошельки-доноры
             receivers: [{                           // массив с описанием получаталей. Здесь можно указать несколько
                 address:    req.body.receiver,      // (выход для сдачи/остатка указывать здесь не нужно)
                 value:      req.body.amount
             }],
             changeAddress: req.body.changeAddress,  // адрес для получения сдачи от транзакции, если она будет
             feeRate: req.body.feeRate,              // ставка комиссии. Подробнее читать в описании функции coinSelect()
+            getWithCache: getWithDiskCache,         // Используем кэш-файлы на диске
         }
 
         // вызываем генератор транзакции
 
-        const transaction = await utxoConsolidation(params)
+        const { transaction } = await utxoConsolidation(params)
 
         // отправляем транзакцию закодированную в HEX-строку. В принципе, она уже готова для отправки в сеть.
 
-        sendJSON(res, {transactionHex: transaction.toHex()})
+        sendJSON(res, {
+            transactionHex: transaction.toHex()
+        })
 
     } catch(error) {
         console.error(error.stack)
@@ -170,35 +175,121 @@ app.post('/api/generate/consolidation', async (req, res) => {
     }
 })
 
-async function clearCache(wallets) {
-    const filenames = wallets.map(w => `/storage/.cacheUTXOs.${w.address}.json`)
-    const p = filenames.map(f => {
+async function deleteCacheFiles({addresses}) {
+    const filenames = addresses.map(a => `/storage/.cacheUTXOs.${a}.json`)
+    const p = filenames.map(filename => {
         try {
-            fs.unlink(f)
+            fs.unlink(filename)
         } catch(_) {}
     })
     await Promise.all(p)
-    return filenames
+    return addresses
+}
+
+function auth({login, pass}) {
+    if(login !== 'peoplebitcoins' || pass !== 'ssiuhiu^&yhweiu') {
+        throw new Error('Authentication/authorization error {login, pass}')
+    }
 }
 
 app.post('/api/send/transaction', async (req, res) => {
 
-    console.log(req.body)
-
     try {
+        console.warn(req.body)
+        auth(req.body)
+        console.warn(req.body)
+
         const resp = await btclib.sendRawTransaction(req.body.transactionHex)       // нам прислали HEX транзакции,
                                                                                     // отправляем ее в сеть
 
-        const cacheFiles = clearCache(await btclib.getWallets())                    // очищает кэш файлы,
-                                                                                    // которые хранят UTXO после
-                                                                                    // сканирования на кошельках (они
-                                                                                    // после транзакции теряют смысл)
-
-            // ответ от ноды будет содержать txid транзакции в сети
-
         sendJSON(res, {
             sendRawTransactionResponse: resp,
-            cacheFilesDeleted: cacheFiles.length,
+        })
+
+    } catch(error) {
+        console.error(error.stack)
+        sendJSON(res, {
+            request: req.body,
+            error
+        })
+    }
+})
+
+app.delete('/api/cache/address-metadata', async (req, res) => {
+
+    try {
+        auth(req.body)
+
+        let addresses = req.body.addresses
+        if(addresses === undefined) {
+            const wallets = await btclib.getWallets()
+            addresses = wallets.map(w => w.adress)
+        }
+
+        await deleteCacheFiles({addresses})
+
+        sendJSON(res, {
+            countAddresses: addresses.length
+        })
+
+    } catch(error) {
+        console.error(error.stack)
+        sendJSON(res, {
+            request: req.body,
+            error
+        })
+    }
+
+})
+
+app.post('/api/generate/manager', async (req, res) => {
+
+    try {
+        auth(req.body)
+
+        const walletsWIF = []
+
+        if(req.body.wallets) {
+            for (const w of req.body.wallets) {
+                const wallet = await btclib.getWalletEx(w.rpcwallet, w.address, w.passphrase)
+                walletsWIF.push(wallet)
+            }
+        } else {
+            const wallets = await btclib.getWallets()
+            walletsWIF.push(...await btclib.getWalletsEx(wallets))
+        }
+
+        const receivers = req.body.receivers.map((r, i) => {
+            if(!r.address || !r.btc) {
+                throw new Error(`receivers[${i}] must have 'address' and 'btc'.`)
+            }
+            return {
+                address:    r.address,
+                value:      r.btc,
+            }
+        })
+
+        const getWithCache = req.body.useCache ? getWithDiskCache : getWithoutCache
+
+        const params = {
+            btclib,
+            walletsWIF,
+            receivers,
+            changeAddress: req.body.changeAddress,
+            feeRate: 15,
+            getWithCache,
+        }
+
+        console.debug({utxoConsolidation: {params}})
+
+        const { transaction, feeBTC, inputAddresses } = await utxoConsolidation(params)
+
+        sendJSON(res, {
+            transactionHex: transaction.toHex(),
+            inputAddresses,
+            fee: {
+                btc: feeBTC
+            }
         })
 
     } catch(error) {

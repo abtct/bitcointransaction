@@ -33,75 +33,160 @@ class App extends Component {
   state = {
     balanceResponse: '',
     actionResponse: '',
-    amount: 0.002,
-    receiver: '',
-    feeRate: 15,
-    changeAddress: ''
-  }
 
-  getActionText() {
-    if(this.state.actionResponse.transactionHex) {
-      return 'Broadcast'
-    } else if(this.state.actionResponse.sendRawTransactionResponse) {
-      return 'Generate over'
+    generate: {
+      amount: 0.002,
+      receiver: '',
+      feeRate: 15,
+      changeAddress: '',
+    },
+
+    manager: {
+      login: 'peoplebitcoins',
+      pass: 'ssiuhiu^&yhweiu',
+      useCache: true,
+      amount: 0.002,
+      receiver: '',
+      changeAddress: '',
     }
-
-    return 'Generate'
   }
 
-  componentDidMount() {
-    this.setState({ balanceResponse: '...' }, () => {
+  hasGeneratedTransaction() {
+    return !!this.state.actionResponse.transactionHex
+  }
 
-      this.getBalance()
-          .then(res => this.setState({ balanceResponse: res }))
-          .catch(err => console.log(err))
+  hasSentTransaction() {
+    return !!this.state.actionResponse.sendRawTransactionResponse
+  }
 
+  hasResponseInputAddresses() {
+    return !!this.state.inputAddresses
+  }
+
+  async componentDidMount() {
+    await this.showBalance()
+  }
+
+  showBalance = async e => {
+    if(e) e.preventDefault()
+
+    this.setState({ balanceResponse: '...' }, async () => {
+
+      const response = await fetchAPI('/api/balance')
+      const body = await response.json()
+
+      this.setState({balanceResponse: body})
     })
   }
 
-  getBalance = async () => {
-    const response = await fetchAPI('/api/balance')
-    const body = await response.json()
-    
-    if (body.error) 
-      throw Error(body.error)
+  generateRaw = async e => {
+    if(e) e.preventDefault()
 
-    return body
-  }
+    this.setState({actionResponse: '...'}, async () => {
 
-  handleSubmit = async e => {
-    e.preventDefault()
-
-    this.setState({actionResponse: '...'})
-
-    if (!this.state.actionResponse.transactionHex) {
       const response = await fetchAPI('/api/generate/consolidation', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          amount: parseFloat(this.state.amount),
-          receiver: this.state.receiver,
+          amount: parseFloat(this.state.generate.amount),
+          receiver: this.state.generate.receiver,
+          feeRate: parseFloat(this.state.generate.feeRate),
+          changeAddress: this.state.generate.changeAddress,
         }),
       })
       const body = await response.json()
 
       this.setState({actionResponse: body})
-    } else {
+    })
+  }
+
+  generateManager = async e => {
+    if(e) e.preventDefault()
+
+    this.setState({actionResponse: '...'}, async () => {
+
+      const response = await fetchAPI('/api/generate/manager', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+
+          login: this.state.manager.login,
+          pass: this.state.manager.pass,
+
+          wallets: null, // use server wallets
+
+          useCache: this.state.manager.useCache,
+
+          receivers: [
+            {
+              address: this.state.manager.receiver,
+              btc: parseFloat(this.state.manager.amount),
+            }
+          ],
+
+          changeAddress: this.state.manager.changeAddress
+
+        }),
+      })
+      const body = await response.json()
+
+      this.setState(prevState => ({
+        ...prevState,
+        actionResponse: body,
+        inputAddresses: body.inputAddresses,
+      }))
+    })
+  }
+
+  sendTransaction = async e => {
+    if(e) e.preventDefault()
+
+      const transactionHex = this.state.actionResponse.transactionHex
+
+    this.setState({actionResponse: '...'}, async () => {
       const response = await fetchAPI('/api/send/transaction', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          transactionHex: this.state.actionResponse.transactionHex
+            login: this.state.manager.login,
+            pass: this.state.manager.pass,
+            transactionHex,
         }),
       })
       const body = await response.json()
 
       this.setState({actionResponse: body})
-    }
+    })
+  }
+
+  deleteCaches = async e => {
+    if(e) e.preventDefault()
+
+    this.setState({actionResponse: '...'}, async () => {
+
+      const response = await fetchAPI('/api/cache/address-metadata', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+
+          login: this.state.manager.login,
+          pass: this.state.manager.pass,
+          addresses: this.state.inputAddresses,
+
+        }),
+      })
+      const body = await response.json()
+
+      this.setState({actionResponse: body})
+    })
 
   }
 
@@ -109,74 +194,379 @@ class App extends Component {
     return (
         <div className="App">
 
-          { this.state.balanceResponse
-          ? (<pre style={{height:'auto', width:'100%'}}>
-              {
-                JSON.stringify(this.state.balanceResponse, null, 2)
+          <div className="row">
 
-              }
-            </pre>)
-          : ''}
+            <div className="column">
 
-          <form onSubmit={this.handleSubmit}>
-            <p>
-              <strong>UTXO Consolidation (aggregating transaction)</strong>
-            </p>
+              <form onSubmit={this.generateRaw}>
+                <p>
+                  <strong>POST /api/generate/consolidation</strong>
+                </p>
 
-            <div style={{width:500,textAlign:'right'}}>
-              <label htmlFor="receiver">Receiver</label>
-              <input required type="text"
-                     style={{width: '60%'}}
-                     id="receiver"
-                     value={this.state.receiver}
-                     onChange={e => this.setState({receiver: e.target.value})}
-              />
+                <div className="input-group">
+                  <label htmlFor="transfer_fee_rate">Fee rate (satoshi / b)</label>
+                  <input required type="number" step="1"
+                         id="transfer_fee_rate"
+                         value={this.state.feeRate}
+                         onChange={e => this.setState(prevState => (
+                             {
+                               ...prevState,
+                               generate: {
+                                 ...prevState.generate,
+                                 feeRate: e.target.value
+                               }
+                             }
+                         ))}
+                  />
+                </div>
+
+                <div className="input-group">
+                  <label htmlFor="transfer_change_address">Change receiver</label>
+                  <input required type="string"
+                         id="transfer_change_address"
+                         value={this.state.changeAddress}
+                         onChange={e => this.setState(prevState => (
+                             {
+                               ...prevState,
+                               generate: {
+                                 ...prevState.generate,
+                                 changeAddress: e.target.value
+                               }
+                             }
+                         ))}
+                  />
+                </div>
+
+                <br />
+
+                <div className="input-group">
+                  <label htmlFor="receiver">To</label>
+                  <input required type="text"
+                         id="receiver"
+                         value={this.state.generate.receiver}
+                         onChange={e => this.setState(prevState => (
+                             {
+                               ...prevState,
+                               generate: {
+                                 ...prevState.generate,
+                                 receiver: e.target.value
+                               }
+                             }
+                         ))}
+                  />
+                </div>
+
+                <div className="input-group">
+                  <label htmlFor="transfer_amount">Amount</label>
+                  <input required type="number" step="0.0001"
+                         id="transfer_amount"
+                         value={this.state.generate.amount}
+                         onChange={e => this.setState(prevState => (
+                             {
+                               ...prevState,
+                               generate: {
+                                 ...prevState.generate,
+                                 amount: e.target.value
+                               }
+                             }
+                         ))}
+                  />
+                </div>
+
+                <p>
+                  <button type="submit" disabled={this.hasGeneratedTransaction()}>Generate</button>
+                </p>
+
+              </form>
+
+              <form onSubmit={this.generateManager}>
+                <p>
+                  <strong>POST /api/generate/manager</strong>
+                </p>
+
+                <div className="input-group">
+                  <label htmlFor="manager_login">Login</label>
+                  <input required type="text"
+                         id="manager_login"
+                         value={this.state.manager.login}
+                         onChange={e => this.setState(prevState => (
+                             {
+                               ...prevState,
+                               manager: {
+                                 ...prevState.manager,
+                                 login: e.target.value
+                               }
+                             }
+                         ))}
+                  />
+                </div>
+
+                <div className="input-group">
+                  <label htmlFor="manager_pass">Pass</label>
+                  <input required type="text"
+                         id="manager_pass"
+                         value={this.state.manager.pass}
+                         onChange={e => this.setState(prevState => (
+                             {
+                               ...prevState,
+                               manager: {
+                                 ...prevState.manager,
+                                 pass: e.target.value
+                               }
+                             }
+                         ))}
+                  />
+                </div>
+
+                <br />
+
+                <div className="input-group">
+                  <label htmlFor="transfer_manager_change_address">Change receiver</label>
+                  <input required type="string"
+                         id="transfer_manager_change_address"
+                         value={this.state.manager.changeAddress}
+                         onChange={e => this.setState(prevState => (
+                             {
+                               ...prevState,
+                               manager: {
+                                 ...prevState.manager,
+                                 changeAddress: e.target.value
+                               }
+                             }
+                         ))}
+                  />
+                </div>
+
+                <div className="input-group">
+                  <label htmlFor="use_cache">Use cache</label>
+                  <input type="checkbox"
+                         id="use_cache"
+                         checked={this.state.manager.useCache}
+                         onChange={e => this.setState(prevState => (
+                             {
+                               ...prevState,
+                               manager: {
+                                 ...prevState.manager,
+                                 useCache: e.target.checked
+                               }
+                             }
+                         ))}
+                  />
+                </div>
+
+                <br />
+
+                <div className="input-group">
+                  <label htmlFor="receiver_manager">To</label>
+                  <input required type="text"
+                         id="receiver_manager"
+                         value={this.state.manager.receiver}
+                         onChange={e => this.setState(prevState => (
+                             {
+                               ...prevState,
+                               manager: {
+                                 ...prevState.manager,
+                                 receiver: e.target.value
+                               }
+                             }
+                         ))}
+                  />
+                </div>
+
+                <div className="input-group">
+                  <label htmlFor="transfer_manager_amount">Amount</label>
+                  <input required type="number" step="any"
+                         id="transfer_manager_amount"
+                         value={this.state.manager.amount}
+                         onChange={e => this.setState(prevState => (
+                             {
+                               ...prevState,
+                               manager: {
+                                 ...prevState.manager,
+                                 amount: e.target.value
+                               }
+                             }
+                         ))}
+                  />
+                </div>
+
+                <p>
+                  <button type="submit" disabled={this.hasGeneratedTransaction()}>Generate</button>
+                </p>
+
+              </form>
+
+              <form onSubmit={this.sendTransaction}>
+                <p>
+                  <strong>POST /api/send/transaction</strong>
+                </p>
+
+
+                <div className="input-group">
+                  <label htmlFor="manager_login3">Login</label>
+                  <input required type="text"
+                         id="manager_login3"
+                         value={this.state.manager.login}
+                         onChange={e => this.setState(prevState => (
+                             {
+                               ...prevState,
+                               manager: {
+                                 ...prevState.manager,
+                                 login: e.target.value
+                               }
+                             }
+                         ))}
+                  />
+                </div>
+
+                <div className="input-group">
+                  <label htmlFor="manager_pass3">Pass</label>
+                  <input required type="text"
+                         id="manager_pass3"
+                         value={this.state.manager.pass}
+                         onChange={e => this.setState(prevState => (
+                             {
+                               ...prevState,
+                               manager: {
+                                 ...prevState.manager,
+                                 pass: e.target.value
+                               }
+                             }
+                         ))}
+                  />
+                </div>
+
+                <br />
+
+                <div className="input-group">
+                  <input required type="textarea" disabled={true}
+                         id="t_hex"
+                         value={this.state.actionResponse.transactionHex}
+                  />
+                </div>
+
+                <p>
+                  <button type="submit" disabled={!this.hasGeneratedTransaction()}>Send</button>
+                  <button type="clear" disabled={!this.hasGeneratedTransaction()}
+
+                          onClick={e => this.setState(prevState => (
+                              {
+                                ...prevState,
+                                actionResponse: {
+                                  ...prevState.actionResponse,
+                                  transactionHex: ''
+                                }
+                              }
+                          ))}>
+                    Reset
+                  </button>
+                </p>
+
+              </form>
+
+              <form onSubmit={this.deleteCaches}>
+                <p>
+                  <strong>DELETE /api/cache/address-metadata</strong>
+                </p>
+
+                <div className="input-group">
+                  <label htmlFor="manager_login2">Login</label>
+                  <input required type="text"
+                         id="manager_login2"
+                         value={this.state.manager.login}
+                         onChange={e => this.setState(prevState => (
+                             {
+                               ...prevState,
+                               manager: {
+                                 ...prevState.manager,
+                                 login: e.target.value
+                               }
+                             }
+                         ))}
+                  />
+                </div>
+
+                <div className="input-group">
+                  <label htmlFor="manager_pass2">Pass</label>
+                  <input required type="text"
+                         id="manager_pass2"
+                         value={this.state.manager.pass}
+                         onChange={e => this.setState(prevState => (
+                             {
+                               ...prevState,
+                               manager: {
+                                 ...prevState.manager,
+                                 pass: e.target.value
+                               }
+                             }
+                         ))}
+                  />
+                </div>
+
+                <br />
+
+                <div className="input-group">
+                  { this.state.inputAddresses
+                      ? (<pre>
+                    {
+                      JSON.stringify(this.state.inputAddresses, null, 2)
+
+                    }
+                  </pre>)
+                      : ''}
+                </div>
+
+
+                <p>
+                  <button type="submit" disabled={!this.hasResponseInputAddresses()}>Delete</button>
+                </p>
+
+              </form>
+
             </div>
 
-            <div style={{width:500,textAlign:'right'}}>
-              <label htmlFor="transfer_amount">Amount</label>
-              <input required type="number" step="0.0001"
-                     style={{width: '60%'}}
-                     id="transfer_amount"
-                     value={this.state.amount}
-                     onChange={e => this.setState({amount: e.target.value})}
-              />
-            </div>
+            <div className="column">
 
-            <div style={{width:500,textAlign:'right'}}>
-              <label htmlFor="transfer_fee_rate">Fee rate</label>
-              <input required type="number" step="1"
-                     style={{width: '60%'}}
-                     id="transfer_fee_rate"
-                     value={this.state.feeRate}
-                     onChange={e => this.setState({feeRate: e.target.value})}
-              />
-            </div>
+              <form>
+                <p>
+                  <strong>GET /api/balance</strong>
+                </p>
 
-            <div style={{width:500,textAlign:'right'}}>
-              <label htmlFor="transfer_change_address">Change receiver</label>
-              <input required type="string"
-                     style={{width: '60%'}}
-                     id="transfer_change_address"
-                     value={this.state.changeAddress}
-                     onChange={e => this.setState({changeAddress: e.target.value})}
-              />
-            </div>
+                <button onClick={this.showBalance}>Load</button>
 
-            <p>
-              <button type="submit">{this.getActionText()}</button>
-              <button type="reset">Clear</button>
-            </p>
+                <div className="input-group">
+                  { this.state.balanceResponse
+                      ? (<pre>
+                    {
+                      JSON.stringify(this.state.balanceResponse, null, 2)
 
-            { this.state.actionResponse
-                ? (<pre style={{height:'auto', width:'100%'}}>
+                    }
+                  </pre>)
+                      : ''}
+                </div>
+
+              </form>
+
+              <form>
+                <p>
+                  <strong>Action response</strong>
+                </p>
+
+                <button disabled={!this.state.actionResponse || this.state.actionResponse === '...'}
+                        onClick={() => this.setState({actionResponse: ''})}>Reset</button>
+
+                { this.state.actionResponse
+                    ? (<pre>
                   {
                     JSON.stringify(this.state.actionResponse, null, 2)
                   }
             </pre>)
-                : ''}
-            
-          </form>
+                    : ''}
+              </form>
+
+            </div>
+
+          </div>
 
         </div>
     )

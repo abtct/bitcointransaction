@@ -1,8 +1,7 @@
 import sb from 'satoshi-bitcoin'
-import getWithCache from "./getWithCache.mjs";
 import {scanUtxoRpcLoop} from "./scanUtxoRpcLoop.mjs";
 
-async function scanUtxoRpcLoopWrap({wallet, rpc, descriptors}) {
+async function scanUtxoRpcLoopWrap({wallet, rpc, descriptors, getWithCache}) {
     try {
         return await getWithCache(
             `/storage/.cacheUTXOs.${wallet.address}.json`,
@@ -13,12 +12,12 @@ async function scanUtxoRpcLoopWrap({wallet, rpc, descriptors}) {
     }
 }
 
-async function getUtxoInputs({btclib, wallet}) {
+async function getUtxoInputs({btclib, wallet, getWithCache}) {
     const rpc = btclib.createClient(wallet.rpcwallet)
 
     const descriptors = [`addr(${wallet.address})`]
 
-    const result = await scanUtxoRpcLoopWrap({ wallet, rpc, descriptors })
+    const result = await scanUtxoRpcLoopWrap({ wallet, rpc, descriptors, getWithCache })
 
     const unspents = []
 

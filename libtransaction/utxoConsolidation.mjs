@@ -38,7 +38,7 @@ function validatedOutputs({receivers, changeAddress}) {
     }
 
     if(!changeAddress) {
-        throw new Error('First receivers item must have an address (default change address)')
+        throw new Error('changeAddress is unset or empty')
     }
 
     for(let i = 0; i < receivers.length; i++) {
@@ -58,20 +58,31 @@ function validatedOutputs({receivers, changeAddress}) {
     return receivers
 }
 
-async function utxoConsolidation({btclib, wallets, receivers, changeAddress, feeRate = 15, network = bitcoin.networks.testnet}) {
+async function utxoConsolidation({
+                                     btclib,
+                                     walletsWIF,
+                                     receivers,
+                                     changeAddress,
+                                     getWithCache,
+                                     feeRate = 15,
+                                     network = bitcoin.networks.testnet}) {
 
     // map { txId: KeyPair }
     const utxoKeyPairs = {}
+
+    // map { txId: wallet address }
+    const utxoWallets = {}
 
     // array [ utxo ]
     const utxoDefs = []
 
     // Wallets -> UTXOs
-    for(const wallet of validatedWallets(wallets)) {
+    for(const wallet of validatedWallets(walletsWIF)) {
         const keyPair = bitcoin.ECPair.fromWIF(wallet.wif, network)
-        for(const utxo of await getUtxoInputs({btclib, wallet, network})) {
+        for(const utxo of await getUtxoInputs({btclib, wallet, network, getWithCache})) {
             utxoDefs.push(utxo)
             utxoKeyPairs[utxo.txId] = keyPair
+            utxoWallets[utxo.txId] = wallet
         }
     }
 
@@ -111,7 +122,13 @@ async function utxoConsolidation({btclib, wallets, receivers, changeAddress, fee
 
     psbt.finalizeAllInputs()
 
-    return psbt.extractTransaction()
+    const inputAddresses = Object.values(inputs.map(input => utxoWallets[input.txId].address))
+
+    return {
+        transaction:    psbt.extractTransaction(),
+        feeBTC:         sb.toBitcoin(fee),
+        inputAddresses: [...new Set(inputAddresses)],
+    }
 }
 
 export default utxoConsolidation
